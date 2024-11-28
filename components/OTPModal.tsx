@@ -1,31 +1,32 @@
+"use client";
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   InputOTP,
   InputOTPGroup,
-  InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import Image from "next/image";
 import React, { useState } from "react";
 import { Button } from "./ui/button";
+import { verifySecret, sendEmailOTP } from "@/lib/actions/users.action";
+import { useRouter } from "next/navigation";
 
 const OTPModal = ({
   email,
   accountId,
 }: {
   email: string;
-  accountId: string | null;
+  accountId: string;
 }) => {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +36,11 @@ const OTPModal = ({
     setIsLoading(true);
     try {
       // call an API to verify OTP
+      const sessionId = await verifySecret({ accountId, password });
+
+      if (sessionId) {
+        router.push("/");
+      }
     } catch (error) {
       console.log(error);
     }
@@ -43,6 +49,7 @@ const OTPModal = ({
 
   const handleResentOTP = async () => {
     // call api to resent API
+    await sendEmailOTP({ email });
   };
 
   return (

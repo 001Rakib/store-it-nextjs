@@ -4,14 +4,17 @@ import { ID, Query } from "node-appwrite";
 import { createAdminClient } from "../appwrite";
 import { appwriteConfig } from "../appwrite/config";
 import { parseStringify } from "../utils";
+import { cookies } from "next/headers";
 
 const getUserByEmail = async (email: string) => {
   const { databases } = await createAdminClient();
+
   const result = await databases.listDocuments(
     appwriteConfig.databaseId,
     appwriteConfig.userCollectionId,
     [Query.equal("email", [email])]
   );
+
   return result.total > 0 ? result.documents[0] : null;
 };
 
@@ -20,13 +23,15 @@ const handleError = (error: unknown, message: string) => {
   throw error;
 };
 
-const sendEmailOTP = async ({ email }: { email: string }) => {
+export const sendEmailOTP = async ({ email }: { email: string }) => {
   const { account } = await createAdminClient();
+
   try {
     const session = await account.createEmailToken(ID.unique(), email);
+
     return session.userId;
   } catch (error) {
-    handleError(error, "Failed to send Email OTP");
+    handleError(error, "Failed to send email OTP");
   }
 };
 
@@ -38,10 +43,13 @@ export const createAccount = async ({
   email: string;
 }) => {
   const existingUser = await getUserByEmail(email);
-  const accountId = sendEmailOTP({ email });
+
+  const accountId = await sendEmailOTP({ email });
   if (!accountId) throw new Error("Failed to send an OTP");
+
   if (!existingUser) {
     const { databases } = await createAdminClient();
+
     await databases.createDocument(
       appwriteConfig.databaseId,
       appwriteConfig.userCollectionId,
@@ -50,11 +58,12 @@ export const createAccount = async ({
         fullName,
         email,
         avatar:
-          "https://w7.pngwing.com/pngs/7/618/png-transparent-man-illustration-avatar-icon-fashion-men-avatar-face-fashion-girl-heroes-thumbnail.png",
+          "https://img.freepik.com/free-psd/3d-illustration-person-with-sunglasses_23-2149436188.jpg",
         accountId,
       }
     );
   }
+
   return parseStringify({ accountId });
 };
 
@@ -64,4 +73,21 @@ export const verifySecret = async ({
 }: {
   accountId: string;
   password: string;
-}) => {};
+}) => {
+  try {
+    const { account } = await createAdminClient();
+
+    const session = await account.createSession(accountId, password);
+
+    (await cookies()).set("appwrite-session", session.secret, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "strict",
+      secure: true,
+    });
+
+    return parseStringify({ sessionId: session.$id });
+  } catch (error) {
+    handleError(error, "Failed to verify OTP");
+  }
+};
